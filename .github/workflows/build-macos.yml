@@ -1,0 +1,107 @@
+name: Build macOS DMG
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust targets
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install frontend dependencies
+        run: bun install
+
+      - name: Build frontend
+        run: bun run build
+
+      - name: Build Apple Silicon .app
+        run: |
+          set -euo pipefail
+          bunx tauri build --target aarch64-apple-darwin --bundles app 2>&1
+          if [ ! -f "src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Voice Type.app/Contents/MacOS/voice_type_tauri" ]; then
+            echo "=== ERROR: aarch64 binary not found ==="
+            find src-tauri/target/aarch64-apple-darwin/release/bundle -type f 2>/dev/null || echo "Bundle directory does not exist at all"
+            exit 1
+          fi
+          echo "aarch64 build succeeded"
+        env:
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+
+      - name: Build Intel .app
+        run: |
+          set -euo pipefail
+          bunx tauri build --target x86_64-apple-darwin --bundles app 2>&1
+          if [ ! -f "src-tauri/target/x86_64-apple-darwin/release/bundle/macos/Voice Type.app/Contents/MacOS/voice_type_tauri" ]; then
+            echo "=== ERROR: x86_64 binary not found ==="
+            find src-tauri/target/x86_64-apple-darwin/release/bundle -type f 2>/dev/null || echo "Bundle directory does not exist at all"
+            exit 1
+          fi
+          echo "x86_64 build succeeded"
+        env:
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+
+      - name: Create universal binary
+        run: |
+          set -euo pipefail
+          ARM_APP="src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Voice Type.app"
+          X86_APP="src-tauri/target/x86_64-apple-darwin/release/bundle/macos/Voice Type.app"
+          UNIVERSAL_APP="src-tauri/target/universal/Voice Type.app"
+
+          mkdir -p src-tauri/target/universal
+          cp -R "$ARM_APP" "$UNIVERSAL_APP"
+
+          lipo -create \
+            "$ARM_APP/Contents/MacOS/voice_type_tauri" \
+            "$X86_APP/Contents/MacOS/voice_type_tauri" \
+            -output "$UNIVERSAL_APP/Contents/MacOS/voice_type_tauri"
+
+          echo "Architectures: $(lipo -archs "$UNIVERSAL_APP/Contents/MacOS/voice_type_tauri")"
+
+      - name: Create DMG
+        run: |
+          mkdir -p staging
+          cp -R "src-tauri/target/universal/Voice Type.app" staging/
+          ln -s /Applications staging/Applications
+
+          hdiutil create -volname "Voice Type" \
+            -srcfolder staging \
+            -ov -format UDZO \
+            "Voice-Type-macos-universal.dmg"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Voice-Type-macos-universal
+          path: Voice-Type-macos-universal.dmg
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: Voice-Type-macos-universal
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Voice-Type-macos-universal.dmg
+          generate_release_notes: true
