@@ -24,12 +24,12 @@ pub fn get_runtime_snapshot(runtime: tauri::State<'_, RuntimeState>) -> RuntimeS
 }
 
 #[tauri::command]
-pub fn save_config(
+pub async fn save_config(
     app: tauri::AppHandle,
     runtime: tauri::State<'_, RuntimeState>,
     config: Config,
 ) -> Result<(), String> {
-    runtime.save_config(&app, config).map_err(|error| {
+    runtime.save_config(&app, config).await.map_err(|error| {
         runtime.update_runtime_state(
             AppState::Error,
             format!("Failed to save settings: {}", error),
@@ -45,9 +45,13 @@ pub fn has_configured_api_key(runtime: tauri::State<'_, RuntimeState>) -> bool {
 }
 
 #[tauri::command]
-pub fn quit_app(app: tauri::AppHandle, runtime: tauri::State<'_, RuntimeState>) {
-    runtime.set_should_quit();
+pub async fn quit_app(
+    app: tauri::AppHandle,
+    runtime: tauri::State<'_, RuntimeState>,
+) -> Result<(), String> {
+    runtime.set_should_quit().await;
     app.exit(0);
+    Ok(())
 }
 
 #[tauri::command]

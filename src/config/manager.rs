@@ -81,9 +81,34 @@ pub fn save(config: &Config) -> Result<()> {
 
     let content = serde_json::to_string_pretty(config).context("Failed to serialize config")?;
 
-    std::fs::write(&path, content).context("Failed to write config file")?;
+    atomic_write(&path, &content).context("Failed to write config file")?;
 
     tracing::info!("Config saved to {:?}", path);
+    Ok(())
+}
+
+/// Atomically write `content` to `path` by writing a temporary sibling file
+/// and renaming it over the target.  This prevents partial writes from
+/// corrupting the file if the process crashes or loses power mid-write.
+pub fn atomic_write(path: &std::path::Path, content: &str) -> Result<()> {
+    let parent = path
+        .parent()
+        .context("Config file has no parent directory")?;
+    std::fs::create_dir_all(parent).context("Failed to create directory for file")?;
+
+    let temp_path = parent.join(format!(
+        ".{}.tmp",
+        path.file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("write")
+    ));
+
+    std::fs::write(&temp_path, content).context("Failed to write temporary file")?;
+
+    // On Windows, PersistFile requires the destination to be replaceable.
+    // std::fs::rename handles this atomically on both platforms.
+    std::fs::rename(&temp_path, path).context("Failed to finalize file write")?;
+
     Ok(())
 }
 

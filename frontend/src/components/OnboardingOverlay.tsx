@@ -47,8 +47,20 @@ export function OnboardingOverlay(props: Props) {
     }
   }
 
+  function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape") {
+      dismiss();
+    }
+  }
+
   return (
-    <div className="onboarding-overlay">
+    <div
+      className="onboarding-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="onboarding-title"
+      onKeyDown={handleKeyDown}
+    >
       <div className="onboarding-card onboarding-wizard">
         <div className="onboarding-dots">
           {Array.from({ length: TOTAL_STEPS }, (_, i) => (
@@ -129,7 +141,7 @@ function ApiKeyStep(props: Props) {
 
   return (
     <div className="onboarding-step-content">
-      <h2>Connect Your Account</h2>
+      <h2 id="onboarding-title">Connect Your Account</h2>
       <p className="onboarding-desc">
         Voice Type uses the Groq Whisper API for transcription. It&apos;s free and fast.
       </p>
@@ -164,7 +176,7 @@ function HotkeyStep(props: Props) {
 
   return (
     <div className="onboarding-step-content">
-      <h2>Pick Your Button</h2>
+      <h2 id="onboarding-title">Pick Your Button</h2>
       <p className="onboarding-desc">
         Hold this key while speaking. Release it and your words are typed instantly.
       </p>
@@ -195,7 +207,7 @@ function StyleStep(props: Props) {
 
   return (
     <div className="onboarding-step-content">
-      <h2>Add Some Style</h2>
+      <h2 id="onboarding-title">Add Some Style</h2>
       <p className="onboarding-desc">
         Optionally add a personal touch to your transcribed text. You can change this anytime in settings.
       </p>

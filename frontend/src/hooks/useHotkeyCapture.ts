@@ -29,6 +29,14 @@ export function useHotkeyCapture(
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Escape cancels capture — provides an always-available exit.
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        void stopHotkeyCapture();
+        return;
+      }
+
       const code = getBrowserKeyboardCode(event);
       if (!code) {
         return;
@@ -44,7 +52,7 @@ export function useHotkeyCapture(
           }
 
           applyCapturedHotkey(payload);
-          void invoke("cancel_hotkey_capture");
+          void invoke("cancel_hotkey_capture").catch(() => {});
         })
         .catch((captureError) => {
           setCapturingHotkey(false);
@@ -53,6 +61,13 @@ export function useHotkeyCapture(
     };
 
     const handleMouseDown = (event: MouseEvent) => {
+      // Let clicks on buttons / interactive UI elements pass through so the
+      // user can still press "Cancel".  Only capture genuine input-area clicks.
+      const target = event.target as HTMLElement | null;
+      if (target && target.closest("button, a, [data-hotkey-safe]")) {
+        return;
+      }
+
       const button = getBrowserMouseButton(event);
       if (button === null) {
         return;
@@ -68,7 +83,7 @@ export function useHotkeyCapture(
           }
 
           applyCapturedHotkey(payload);
-          void invoke("cancel_hotkey_capture");
+          void invoke("cancel_hotkey_capture").catch(() => {});
         })
         .catch((captureError) => {
           setCapturingHotkey(false);

@@ -66,7 +66,7 @@ pub async fn transcription_task(
         );
         match transcribe(audio_bytes, &prepared.options, prepared.provider).await {
             Ok(text) => {
-                info!("Transcription received: '{}'", text);
+                info!("Transcription received ({} chars)", text.chars().count());
 
                 let processed = process_transcription(&text, &app_state).await;
                 if let Some(final_text) = processed {

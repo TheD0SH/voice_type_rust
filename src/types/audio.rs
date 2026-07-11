@@ -17,6 +17,10 @@ pub struct RecordingState {
     pub running: AtomicBool,
     /// Collected audio samples (interleaved if stereo)
     pub samples: Mutex<Vec<i16>>,
+    /// Total audio frames processed so far (for silence timing).
+    pub frames_processed: std::sync::atomic::AtomicU64,
+    /// Frames since the last frame above the noise threshold.
+    pub silent_frames: std::sync::atomic::AtomicU64,
 }
 
 impl RecordingState {
@@ -25,6 +29,8 @@ impl RecordingState {
         Self {
             running: AtomicBool::new(true),
             samples: Mutex::new(Vec::with_capacity(SAMPLE_RATE as usize * 60)),
+            frames_processed: std::sync::atomic::AtomicU64::new(0),
+            silent_frames: std::sync::atomic::AtomicU64::new(0),
         }
     }
 
@@ -36,6 +42,24 @@ impl RecordingState {
     /// Stop the recording
     pub fn stop(&self) {
         self.running.store(false, Ordering::Release);
+    }
+
+    /// Record a frame's level for auto-stop purposes.
+    /// Call once per audio callback invocation with the peak level (0.0–1.0)
+    /// and the number of frames in that invocation.
+    pub fn record_level(&self, level: f32, frame_count: u64, noise_threshold: f32) {
+        self.frames_processed
+            .fetch_add(frame_count, Ordering::Relaxed);
+        if level >= noise_threshold {
+            self.silent_frames.store(0, Ordering::Relaxed);
+        } else {
+            self.silent_frames.fetch_add(frame_count, Ordering::Relaxed);
+        }
+    }
+
+    /// Returns the number of consecutive silent frames so far.
+    pub fn silent_frame_count(&self) -> u64 {
+        self.silent_frames.load(Ordering::Relaxed)
     }
 }
 

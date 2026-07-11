@@ -1,5 +1,4 @@
 import type { CSSProperties } from "react";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import type { BackgroundMode, Config, RuntimeState, ThemeMode } from "../types";
 import defaultBackground from "../assets/default-background.jpg";
 
@@ -27,19 +26,6 @@ export function runtimeBadge(state: RuntimeState) {
       return { label: "Needs attention", tone: "state-pill error" };
     default:
       return { label: "Standing by", tone: "state-pill ready" };
-  }
-}
-
-export function safeBackgroundUrl(path: string): string | null {
-  const trimmed = path.trim();
-  if (!trimmed) {
-    return null;
-  }
-
-  try {
-    return convertFileSrc(trimmed);
-  } catch {
-    return null;
   }
 }
 

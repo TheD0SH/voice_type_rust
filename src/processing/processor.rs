@@ -45,7 +45,24 @@ static CONSECUTIVE_PUNCTUATION_REGEX: Lazy<Regex> =
 pub fn apply_casual_mode(text: &str) -> String {
     let mut result = text.to_lowercase();
 
-    result.retain(|c| !matches!(c, '.' | ',' | '!' | '?' | ';' | ':'));
+    // Only strip casual punctuation that sits at a word boundary — i.e. it is
+    // preceded or followed by whitespace (or by the start/end of the string).
+    // Punctuation embedded inside tokens (e.g. "3.14", "example.com", "12:30")
+    // is preserved so we don't corrupt numbers, URLs, and times.
+    let chars: Vec<char> = result.chars().collect();
+    let mut filtered = String::with_capacity(result.len());
+    for (i, &c) in chars.iter().enumerate() {
+        if matches!(c, '.' | ',' | '!' | '?' | ';' | ':') {
+            let prev_is_boundary = i == 0 || chars[i - 1].is_whitespace();
+            let next_is_boundary = i + 1 == chars.len() || chars[i + 1].is_whitespace();
+            if prev_is_boundary || next_is_boundary {
+                // Drop this punctuation: it's at a word boundary.
+                continue;
+            }
+        }
+        filtered.push(c);
+    }
+    result = filtered;
 
     result = result.split_whitespace().collect::<Vec<_>>().join(" ");
 

@@ -9,31 +9,58 @@ pub struct UpdateInfo {
     pub update_available: bool,
 }
 
+/// Parse a version string, stripping a leading "v" prefix, into a semver
+/// `Version` suitable for ordering comparisons.
+fn parse_version(raw: &str) -> Option<semver::Version> {
+    let stripped = raw.trim().trim_start_matches('v');
+    semver::Version::parse(stripped).ok()
+}
+
 #[tauri::command]
 pub async fn check_for_updates() -> Result<Option<UpdateInfo>, String> {
-    let current = voice_type::VERSION;
+    let current_raw = voice_type::VERSION;
+    let current = match parse_version(current_raw) {
+        Some(v) => v,
+        None => return Ok(None),
+    };
 
+    // Skip prerelease builds of the running app.
+    if !current.pre.is_empty() {
+        return Ok(None);
+    }
+
+    // Any network failure is treated as "check failed, no update info".
     let response = reqwest::Client::new()
         .get("https://api.github.com/repos/boring877/voice_type_rust/releases/latest")
         .header("User-Agent", "Voice-Type-Desktop")
         .timeout(std::time::Duration::from_secs(10))
         .send()
         .await
-        .map_err(|e| format!("Update check failed: {}", e))?;
+        .ok();
 
-    if !response.status().is_success() {
+    let response = match response {
+        Some(r) if r.status().is_success() => r,
+        _ => return Ok(None),
+    };
+
+    let body: serde_json::Value = match response.json().await {
+        Ok(b) => b,
+        Err(_) => return Ok(None),
+    };
+
+    let tag = body["tag_name"].as_str().unwrap_or("");
+    let latest = match parse_version(tag) {
+        Some(v) => v,
+        None => return Ok(None),
+    };
+
+    // Skip prerelease releases.
+    if !latest.pre.is_empty() {
         return Ok(None);
     }
 
-    let body: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse update response: {}", e))?;
-
-    let tag = body["tag_name"].as_str().unwrap_or("");
-    let latest = tag.trim_start_matches('v');
-
-    if latest.is_empty() {
+    // An update is available only if latest is strictly greater than current.
+    if latest <= current {
         return Ok(None);
     }
 
@@ -41,17 +68,6 @@ pub async fn check_for_updates() -> Result<Option<UpdateInfo>, String> {
         .as_str()
         .unwrap_or("https://github.com/boring877/voice_type_rust/releases")
         .to_string();
-
-    if latest == current {
-        return Ok(None);
-    }
-
-    let latest_major: u32 = latest.split('.').next().and_then(|s| s.parse().ok()).unwrap_or(0);
-    let current_major: u32 = current.split('.').next().and_then(|s| s.parse().ok()).unwrap_or(0);
-
-    if latest_major < current_major {
-        return Ok(None);
-    }
 
     Ok(Some(UpdateInfo {
         current_version: current.to_string(),

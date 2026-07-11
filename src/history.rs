@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use tracing::{info, warn};
 
 use crate::config::config_dir;
+use crate::config::atomic_write;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -46,6 +47,12 @@ pub fn load() -> Vec<HistoryEntry> {
         Ok(entries) => entries,
         Err(e) => {
             warn!("Failed to parse history file: {}", e);
+            // Back up the corrupt file so the user can recover it later,
+            // rather than silently overwriting it on the next push().
+            let backup = path.with_extension("json.corrupt");
+            if let Err(backup_err) = std::fs::rename(&path, &backup) {
+                warn!("Failed to back up corrupt history file: {}", backup_err);
+            }
             Vec::new()
         }
     }
@@ -70,8 +77,7 @@ pub fn push(text: &str) -> Result<()> {
 
     let content = serde_json::to_string_pretty(&entries)
         .context("Failed to serialize history")?;
-    std::fs::write(&path, content)
-        .context("Failed to write history file")?;
+    atomic_write(&path, &content).context("Failed to write history file")?;
 
     info!("History entry saved ({} entries)", entries.len());
     Ok(())

@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use std::sync::Arc;
 use super::{first_line, RuntimeState, RuntimeSnapshot};
 use tauri::menu::MenuBuilder;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
@@ -55,7 +56,17 @@ pub(crate) fn create_tray(app: &AppHandle) -> Result<TrayIcon<Wry>> {
 
 pub(crate) fn quit_runtime(app: &AppHandle) {
     if let Some(runtime) = app.try_state::<RuntimeState>() {
-        runtime.set_should_quit();
+        // Extract the shared state Arc so the async task owns it and isn't
+        // borrowed from the Tauri State<'_> which can't escape this function.
+        let shared_state = Arc::clone(&runtime.shared_state);
+        let app_clone = app.clone();
+        tauri::async_runtime::spawn(async move {
+            let mut state = shared_state.lock().await;
+            state.should_quit = true;
+            drop(state);
+            app_clone.exit(0);
+        });
+        return;
     }
     app.exit(0);
 }

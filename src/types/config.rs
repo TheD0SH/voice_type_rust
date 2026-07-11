@@ -2,7 +2,7 @@
 //!
 //! Contains the Config struct for user configuration.
 
-use crate::api::constants::TRANSCRIPTION_MODEL_TURBO;
+use crate::api::constants::DEFAULT_TRANSCRIPTION_MODEL;
 use crate::config::{
     BACKGROUND_MODE_IMAGE, DEFAULT_BACKGROUND_COLOR, DEFAULT_BACKGROUND_GRADIENT_END,
     DEFAULT_BACKGROUND_GRADIENT_START, DEFAULT_HOTKEY, DEFAULT_LANGUAGE, DEFAULT_NOISE_THRESHOLD,
@@ -20,21 +20,27 @@ pub const GROQ_API_KEY_ENV_VAR: &str = "GROQ_API_KEY";
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Config {
     /// Groq API key for transcription
+    #[serde(default)]
     pub api_key: String,
 
     /// Selected microphone index (None = default)
+    #[serde(default)]
     pub mic_index: Option<usize>,
 
     /// Push-to-talk hotkey (e.g., "shift", "ctrl", "f9")
+    #[serde(default = "default_hotkey")]
     pub hotkey: String,
 
     /// Enable accounting mode (convert words to numbers)
+    #[serde(default)]
     pub accounting_mode: bool,
 
     /// Add commas to large numbers in accounting mode
+    #[serde(default)]
     pub accounting_comma: bool,
 
     /// Enable casual mode (lowercase, informal punctuation)
+    #[serde(default)]
     pub casual_mode: bool,
 
     /// Replace common phrases with shorthand/slang output
@@ -46,9 +52,11 @@ pub struct Config {
     pub style: String,
 
     /// Words/phrases to filter out from transcription
+    #[serde(default)]
     pub filter_words: Vec<String>,
 
     /// UI theme ("dark" or "light")
+    #[serde(default = "default_theme")]
     pub theme: String,
 
     /// Background mode ("solid", "gradient", or "image")
@@ -88,15 +96,19 @@ pub struct Config {
     pub meter_color_end: String,
 
     /// Auto-stop recording after silence
+    #[serde(default)]
     pub auto_stop: bool,
 
     /// Seconds of silence before auto-stop
+    #[serde(default = "default_silence_threshold")]
     pub silence_threshold: f32,
 
     /// Audio noise threshold (0.0 - 1.0)
+    #[serde(default = "default_noise_threshold")]
     pub noise_threshold: f32,
 
     /// Language code ("auto" for auto-detect)
+    #[serde(default = "default_language")]
     pub language: String,
 
     /// Whisper transcription model ID on Groq.
@@ -104,6 +116,7 @@ pub struct Config {
     pub transcription_model: String,
 
     /// Keep widget always on top
+    #[serde(default)]
     pub always_on_top: bool,
 
     /// Enable the floating recording HUD
@@ -143,9 +156,11 @@ pub struct Config {
     pub hud_background_color: String,
 
     /// Auto-copy transcription to clipboard
+    #[serde(default)]
     pub auto_copy: bool,
 
     /// Transcription provider (currently "groq")
+    #[serde(default = "default_provider")]
     pub provider: String,
 }
 
@@ -221,6 +236,30 @@ fn default_style() -> String {
     "none".to_string()
 }
 
+fn default_hotkey() -> String {
+    DEFAULT_HOTKEY.to_string()
+}
+
+fn default_theme() -> String {
+    THEME_DARK.to_string()
+}
+
+fn default_silence_threshold() -> f32 {
+    DEFAULT_SILENCE_THRESHOLD
+}
+
+fn default_noise_threshold() -> f32 {
+    DEFAULT_NOISE_THRESHOLD
+}
+
+fn default_language() -> String {
+    DEFAULT_LANGUAGE.to_string()
+}
+
+fn default_provider() -> String {
+    PROVIDER_GROQ.to_string()
+}
+
 fn default_background_mode() -> String {
     BACKGROUND_MODE_IMAGE.to_string()
 }
@@ -238,7 +277,7 @@ fn default_background_gradient_end() -> String {
 }
 
 fn default_transcription_model() -> String {
-    TRANSCRIPTION_MODEL_TURBO.to_string()
+    DEFAULT_TRANSCRIPTION_MODEL.to_string()
 }
 
 fn default_hud_enabled() -> bool {

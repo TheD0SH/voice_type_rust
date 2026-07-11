@@ -6,16 +6,6 @@ const STORAGE_KEY = "voice-type-update-dismissed";
 
 export function useUpdateCheck(loading: boolean) {
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
-  const [dismissed, setDismissed] = useState(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) return false;
-    try {
-      const parsed = JSON.parse(saved) as { version: string; dismissedAt: number };
-      return parsed.version === saved;
-    } catch {
-      return false;
-    }
-  });
 
   useEffect(() => {
     if (loading) return;
@@ -47,7 +37,6 @@ export function useUpdateCheck(loading: boolean) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: update.latestVersion }));
     }
     setUpdate(null);
-    setDismissed(true);
   }
 
   return { update, dismissUpdate };

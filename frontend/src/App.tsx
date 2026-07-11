@@ -37,7 +37,6 @@ export default function App() {
 
   const configRef = useRef(config);
   const savedConfigRef = useRef(savedConfig);
-  const prevAppStateRef = useRef(runtime.appState);
 
   useEffect(() => {
     configRef.current = config;
@@ -46,13 +45,6 @@ export default function App() {
   useEffect(() => {
     savedConfigRef.current = savedConfig;
   }, [savedConfig]);
-
-  useEffect(() => {
-    const prev = prevAppStateRef.current;
-    const curr = runtime.appState;
-
-    prevAppStateRef.current = curr;
-  }, [runtime.appState]);
 
   function applyRuntimeSnapshot(snapshot: RuntimeSnapshot) {
     const shouldAdoptDraft = configsEqual(configRef.current, savedConfigRef.current);
@@ -317,7 +309,9 @@ export default function App() {
               </button>
             </div>
 
-            {activeTab === "history" && <HistorySection />}
+            <div style={{ display: activeTab === "history" ? "block" : "none" }}>
+              <HistorySection active={activeTab === "history"} />
+            </div>
 
             {activeTab === "settings" && !advancedMode && (
               <QuickStartSection

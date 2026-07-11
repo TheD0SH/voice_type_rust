@@ -411,6 +411,31 @@ impl HotkeyState {
         false
     }
 
+    /// Check whether `key` matches the target binding, treating left/right
+    /// modifier pairs as interchangeable.
+    ///
+    /// A binding of ShiftLeft also matches ShiftRight (and vice versa); the same
+    /// applies to ControlLeft/ControlRight, Alt/AltGr, and MetaLeft/MetaRight.
+    /// Non-modifier bindings still require exact equality.
+    fn matches_modifier(&self, key: Key) -> bool {
+        match self.get_target_binding() {
+            InputBinding::Key(target) => {
+                if target == key {
+                    return true;
+                }
+                let same_side = |a: Key, b: Key, left: Key, right: Key| {
+                    (a == left || a == right) && (b == left || b == right)
+                };
+                same_side(target, key, Key::ShiftLeft, Key::ShiftRight)
+                    || same_side(target, key, Key::ControlLeft, Key::ControlRight)
+                    || same_side(target, key, Key::Alt, Key::AltGr)
+                    || same_side(target, key, Key::MetaLeft, Key::MetaRight)
+            }
+            // Mouse bindings never match a keyboard key.
+            InputBinding::Mouse(_) => false,
+        }
+    }
+
     /// Record a key press.
     pub fn press_key(&self, key: Key) {
         if self.try_capture_binding(InputBinding::Key(key)) {
@@ -421,7 +446,7 @@ impl HotkeyState {
             keys.insert(key);
         }
 
-        if self.get_target_binding() == InputBinding::Key(key) {
+        if self.matches_modifier(key) {
             self.is_recording.store(true, Ordering::Release);
         }
     }
@@ -432,7 +457,7 @@ impl HotkeyState {
             keys.remove(&key);
         }
 
-        if self.get_target_binding() == InputBinding::Key(key) {
+        if self.matches_modifier(key) {
             self.is_recording.store(false, Ordering::Release);
         }
     }

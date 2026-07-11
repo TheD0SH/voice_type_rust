@@ -49,10 +49,15 @@ pub async fn audio_recording_task(
         // Update UI state
         let _ = gui_tx.try_send(GuiCommand::SetState(AppState::Recording));
 
-        // Record audio while hotkey is held
-        let mic_index = {
+        // Read recording config
+        let (mic_index, auto_stop, silence_threshold, noise_threshold) = {
             let state = app_state.lock().await;
-            state.config.mic_index
+            (
+                state.config.mic_index,
+                state.config.auto_stop,
+                state.config.silence_threshold,
+                state.config.noise_threshold,
+            )
         };
         let level_tx_clone = level_tx.clone();
 
@@ -64,6 +69,9 @@ pub async fn audio_recording_task(
                 mic_index,
                 || is_recording(&hotkey_state_clone),
                 level_tx_clone,
+                auto_stop,
+                silence_threshold,
+                noise_threshold,
             )
         })
         .await;
@@ -78,6 +86,18 @@ pub async fn audio_recording_task(
                     // Send to transcription task
                     if let Err(e) = transcription_tx.send(audio_bytes).await {
                         error!("Failed to send audio to transcription: {}", e);
+
+                        // Receiver was dropped: the transcription service is no
+                        // longer available. Surface the failure to the UI rather
+                        // than silently continuing.
+                        let _ = gui_tx
+                            .try_send(GuiCommand::SetStatus("Transcription service unavailable".to_string()));
+                        let _ = gui_tx.try_send(GuiCommand::SetState(AppState::Error));
+
+                        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+                        let _ = gui_tx.try_send(GuiCommand::SetState(AppState::Ready));
+
+                        continue;
                     }
                 } else {
                     warn!("Recording too short, discarding");

@@ -76,6 +76,9 @@ pub fn build_config(
 /// * `mic_index` - Which microphone to use (None = default)
 /// * `should_record` - Closure that returns true while recording should continue
 /// * `level_tx` - Channel to send audio levels for UI visualization
+/// * `auto_stop` - When true, stop after `silence_threshold` seconds of silence
+/// * `silence_threshold` - Seconds of continuous silence before auto-stop
+/// * `noise_threshold` - Audio level (0.0–1.0) below which a frame is "silent"
 ///
 /// # Returns
 /// WAV-encoded audio bytes ready for API upload
@@ -83,6 +86,9 @@ pub fn record_while<F>(
     mic_index: Option<usize>,
     mut should_record: F,
     level_tx: mpsc::Sender<f32>,
+    auto_stop: bool,
+    silence_threshold: f32,
+    noise_threshold: f32,
 ) -> Result<Vec<u8>>
 where
     F: FnMut() -> bool,
@@ -105,15 +111,36 @@ where
     let state_clone = Arc::clone(&state);
 
     // Build the audio stream
-    let stream = build_stream(&device, &config, sample_format, state_clone, level_tx)?;
+    let stream = build_stream(
+        &device,
+        &config,
+        sample_format,
+        state_clone,
+        level_tx,
+        noise_threshold,
+    )?;
 
     // Start recording
     stream.play().context("Failed to start audio stream")?;
 
     tracing::info!("Recording started...");
 
+    // Frames of silence needed to auto-stop (convert seconds → frames).
+    let silence_frame_limit = (silence_threshold.max(0.0) * actual_sample_rate as f32) as u64;
+
     // Block while recording
     while should_record() && state.is_running() {
+        // Check auto-stop: enough consecutive silent frames
+        if auto_stop && silence_frame_limit > 0 {
+            let silent = state.silent_frame_count();
+            if silent >= silence_frame_limit {
+                tracing::info!(
+                    "Auto-stop: {:.1}s of silence detected",
+                    silent as f32 / actual_sample_rate as f32
+                );
+                break;
+            }
+        }
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
 
@@ -171,18 +198,19 @@ pub fn build_stream(
     sample_format: cpal::SampleFormat,
     state: Arc<RecordingState>,
     level_tx: mpsc::Sender<f32>,
+    noise_threshold: f32,
 ) -> Result<cpal::Stream> {
     let channels = config.channels as usize;
 
     match sample_format {
         cpal::SampleFormat::I16 => {
-            build_stream_inner::<i16>(device, config, state, level_tx, channels)
+            build_stream_inner::<i16>(device, config, state, level_tx, channels, noise_threshold)
         }
         cpal::SampleFormat::U16 => {
-            build_stream_inner::<u16>(device, config, state, level_tx, channels)
+            build_stream_inner::<u16>(device, config, state, level_tx, channels, noise_threshold)
         }
         cpal::SampleFormat::F32 => {
-            build_stream_inner::<f32>(device, config, state, level_tx, channels)
+            build_stream_inner::<f32>(device, config, state, level_tx, channels, noise_threshold)
         }
         _ => Err(anyhow::anyhow!(
             "Unsupported sample format: {:?}",
@@ -198,6 +226,7 @@ fn build_stream_inner<T>(
     state: Arc<RecordingState>,
     level_tx: mpsc::Sender<f32>,
     channels: usize,
+    noise_threshold: f32,
 ) -> Result<cpal::Stream>
 where
     T: cpal::SizedSample + Send + 'static,
@@ -212,12 +241,19 @@ where
                 // Downmix to mono so stereo/default device layouts don't corrupt timing.
                 let converted = downmix_to_mono(data, channels);
 
-                // Calculate audio level for visualization (0.0 - 1.0)
-                let max_level =
-                    converted.iter().map(|&s| s.abs()).max().unwrap_or(0) as f32 / 32768.0;
+                // Calculate audio level for visualization (0.0 - 1.0).
+                // Widen to i32 before abs() — i16::abs() panics on i16::MIN (-32768).
+                let max_level = converted
+                    .iter()
+                    .map(|&s| (s as i32).unsigned_abs() as f32)
+                    .fold(0.0_f32, f32::max)
+                    / 32768.0;
 
                 // Send level to UI (non-blocking, ignore errors if channel full)
                 let _ = level_tx.try_send(max_level.min(1.0));
+
+                // Track silence for auto-stop (frame count = samples / channels)
+                state.record_level(max_level, converted.len() as u64, noise_threshold);
 
                 // Store samples if still recording
                 if state.is_running() {

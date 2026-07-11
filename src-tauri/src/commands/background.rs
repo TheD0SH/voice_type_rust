@@ -29,6 +29,24 @@ fn import_background_asset(path: &str, file_stem: &str) -> Result<String, String
         return Err("Unsupported background image format".to_string());
     }
 
+    // Read a bounded prefix and verify the file is actually a decodable image.
+    // This prevents importing arbitrary files (e.g. secrets renamed to .png)
+    // which could later be exfiltrated via load_background_image_data_url.
+    const MAX_IMAGE_BYTES: u64 = 32 * 1024 * 1024; // 32 MB
+    let metadata = std::fs::metadata(&source)
+        .map_err(|error| format!("Failed to read file metadata: {}", error))?;
+    if metadata.len() > MAX_IMAGE_BYTES {
+        return Err("Background image exceeds the 32 MB size limit".to_string());
+    }
+
+    let bytes = std::fs::read(&source)
+        .map_err(|error| format!("Failed to read background image: {}", error))?;
+    if !is_valid_image_header(&bytes, &extension) {
+        return Err(
+            "File does not contain valid image data matching its extension".to_string(),
+        );
+    }
+
     let destination_dir = config::backgrounds_dir()
         .map_err(|error| format!("Failed to prepare backgrounds directory: {}", error))?;
 
@@ -36,7 +54,7 @@ fn import_background_asset(path: &str, file_stem: &str) -> Result<String, String
         .map_err(|error| format!("Failed to replace existing background image: {}", error))?;
 
     let destination = destination_dir.join(format!("{}.{}", file_stem, extension));
-    std::fs::copy(&source, &destination)
+    std::fs::write(&destination, &bytes)
         .map_err(|error| format!("Failed to import background image: {}", error))?;
 
     destination
@@ -109,4 +127,26 @@ fn remove_old_background_assets(directory: &Path, file_stem: &str) -> Result<(),
     }
 
     Ok(())
+}
+
+/// Verify the byte stream starts with a recognized image magic-number sequence
+/// that matches the declared extension.  This blocks importing arbitrary files
+/// that merely carry an image extension.
+fn is_valid_image_header(bytes: &[u8], extension: &str) -> bool {
+    if bytes.len() < 12 {
+        return false;
+    }
+    match extension {
+        "png" => bytes.starts_with(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
+        "jpg" | "jpeg" => bytes.starts_with(&[0xFF, 0xD8, 0xFF]),
+        "gif" => bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a"),
+        "bmp" => bytes.starts_with(&[0x42, 0x4D]), // "BM"
+        "webp" => {
+            // RIFF....WEBP
+            bytes.len() >= 12
+                && &bytes[0..4] == b"RIFF"
+                && &bytes[8..12] == b"WEBP"
+        }
+        _ => false,
+    }
 }

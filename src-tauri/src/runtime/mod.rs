@@ -42,30 +42,20 @@ pub struct HotkeyCapturePayload {
 
 pub struct RuntimeState {
     snapshot: Arc<StdMutex<RuntimeSnapshot>>,
-    shared_state: Arc<Mutex<SharedState>>,
+    pub(crate) shared_state: Arc<Mutex<SharedState>>,
     hotkey_state: Arc<HotkeyState>,
     gui_tx: mpsc::Sender<GuiCommand>,
-    _instance: Option<SingleInstance>,
+    _instance: SingleInstance,
     _runtime: Arc<tokio::runtime::Runtime>,
 }
 
 impl RuntimeState {
     pub fn initialize(app: &AppHandle) -> Result<Self> {
-        let instance = match SingleInstance::new(SINGLE_INSTANCE_ID) {
-            Ok(inst) => Some(inst),
-            Err(e) => {
-                tracing::warn!(
-                    "Single instance check failed, continuing without lock: {}",
-                    e
-                );
-                None
-            }
-        };
+        let instance = SingleInstance::new(SINGLE_INSTANCE_ID)
+            .context("Failed to acquire single-instance lock")?;
 
-        if let Some(ref inst) = instance {
-            if !inst.is_single() {
-                anyhow::bail!("Another instance is already running");
-            }
+        if !instance.is_single() {
+            anyhow::bail!("Another instance is already running");
         }
 
         let config = config::load();
@@ -79,7 +69,7 @@ impl RuntimeState {
         let (transcription_tx, transcription_rx) = mpsc::channel(4);
 
         let runtime = Arc::new(
-            tokio::runtime::Runtime::new().expect("failed to create shared tokio runtime"),
+            tokio::runtime::Runtime::new().context("Failed to create shared tokio runtime")?,
         );
 
         spawn_audio_task(
@@ -109,7 +99,7 @@ impl RuntimeState {
             let _ = window.set_always_on_top(config.always_on_top);
         }
 
-        update_tray_tooltip(app, &snapshot.lock().unwrap().clone());
+        update_tray_tooltip(app, &snapshot.lock().unwrap_or_else(|e| e.into_inner()).clone());
 
         Ok(Self {
             snapshot,
@@ -129,14 +119,14 @@ impl RuntimeState {
         self.hotkey_state.cancel_capture();
     }
 
-    pub fn save_config(&self, app: &AppHandle, config: Config) -> Result<()> {
+    pub async fn save_config(&self, app: &AppHandle, config: Config) -> Result<()> {
         let binding = parse_hotkey(&config.hotkey)
             .with_context(|| format!("Invalid hotkey configuration: {}", config.hotkey))?;
 
         config::save(&config).context("Failed to save configuration")?;
 
         {
-            let mut state = self.shared_state.blocking_lock();
+            let mut state = self.shared_state.lock().await;
             state.config = config.clone();
         }
 
@@ -164,8 +154,8 @@ impl RuntimeState {
         Ok(())
     }
 
-    pub fn set_should_quit(&self) {
-        let mut state = self.shared_state.blocking_lock();
+    pub async fn set_should_quit(&self) {
+        let mut state = self.shared_state.lock().await;
         state.should_quit = true;
     }
 

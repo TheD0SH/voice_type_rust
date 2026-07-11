@@ -33,15 +33,22 @@ function truncate(text: string, max: number): string {
   return text.slice(0, max) + "...";
 }
 
-export function HistorySection() {
+interface HistorySectionProps {
+  active: boolean;
+}
+
+export function HistorySection({ active }: HistorySectionProps) {
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   useEffect(() => {
+    if (!active) {
+      return;
+    }
     invoke<HistoryEntry[]>("get_history")
       .then(setEntries)
       .catch(() => {});
-  }, []);
+  }, [active]);
 
   async function handleCopy(text: string, index: number) {
     try {

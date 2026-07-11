@@ -1,8 +1,12 @@
 #[tauri::command]
 pub fn open_external_url(url: String) -> Result<(), String> {
     let trimmed = url.trim();
-    if !(trimmed.starts_with("https://") || trimmed.starts_with("http://")) {
-        return Err("Only http and https URLs are allowed".to_string());
+    if !trimmed.starts_with("https://") {
+        return Err("Only https URLs are allowed".to_string());
+    }
+
+    if trimmed.chars().any(char::is_control) {
+        return Err("URL contains invalid control characters".to_string());
     }
 
     open::that(trimmed)
@@ -34,6 +38,16 @@ pub fn play_beep(frequency: u32, duration_ms: u32) -> Result<(), String> {
             unsafe {
                 win_beep::Beep(frequency, duration_ms);
             }
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            // Minimal fallback audio feedback: write the ASCII BEL character
+            // to stderr. This gives at least some audible signal on platforms
+            // without a dedicated beep API.
+            let _ = frequency;
+            let _ = duration_ms;
+            let _ = std::io::Write::write_all(&mut std::io::stderr(), b"\x07");
         }
     });
     Ok(())

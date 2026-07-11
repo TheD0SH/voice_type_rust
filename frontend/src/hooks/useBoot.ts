@@ -41,7 +41,7 @@ export function useBoot(
 
         unlisteners.push(runtimeUnlisten, captureUnlisten);
 
-        const [snapshot, info, microphones] = await Promise.all([
+        const [snapshotResult, infoResult, microphonesResult] = await Promise.allSettled([
           invoke<RuntimeSnapshot>("get_runtime_snapshot"),
           invoke<AppInfo>("get_app_info"),
           invoke<string[]>("list_microphones")
@@ -51,9 +51,19 @@ export function useBoot(
           return;
         }
 
-        applyRuntimeSnapshot(snapshot);
-        setAppInfo(info);
-        setMicNames(microphones);
+        if (snapshotResult.status === "fulfilled") {
+          applyRuntimeSnapshot(snapshotResult.value);
+        } else {
+          throw snapshotResult.reason;
+        }
+
+        if (infoResult.status === "fulfilled") {
+          setAppInfo(infoResult.value);
+        } else {
+          throw infoResult.reason;
+        }
+
+        setMicNames(microphonesResult.status === "fulfilled" ? microphonesResult.value : []);
         setError(null);
       } catch (bootError) {
         if (!mounted) {

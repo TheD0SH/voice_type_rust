@@ -272,28 +272,50 @@ pub fn start_listener(hotkey_str: &str) -> Result<Arc<HotkeyState>> {
     // Store the hotkey string for logging
     let hotkey_owned = hotkey_str.to_string();
 
-    // Spawn listener thread
+    // Spawn listener thread with automatic retry on failure.
     std::thread::spawn(move || {
         tracing::info!("Starting global hotkey listener for: {}", hotkey_owned);
 
-        let callback = move |event: rdev::Event| match event.event_type {
-            EventType::KeyPress(key) => {
-                state_clone.press_key(key);
-            }
-            EventType::KeyRelease(key) => {
-                state_clone.release_key(key);
-            }
-            EventType::ButtonPress(button) => {
-                state_clone.press_button(button);
-            }
-            EventType::ButtonRelease(button) => {
-                state_clone.release_button(button);
-            }
-            _ => {}
-        };
+        // Retry with exponential backoff so a transient rdev failure doesn't
+        // permanently disable push-to-talk.
+        let mut backoff_secs = 1u64;
+        const MAX_BACKOFF_SECS: u64 = 30;
 
-        if let Err(e) = listen(callback) {
-            tracing::error!("Hotkey listener error: {:?}", e);
+        loop {
+            // Recreate the callback each iteration because listen() takes ownership.
+            let state_for_cb = Arc::clone(&state_clone);
+            let callback = move |event: rdev::Event| match event.event_type {
+                EventType::KeyPress(key) => {
+                    state_for_cb.press_key(key);
+                }
+                EventType::KeyRelease(key) => {
+                    state_for_cb.release_key(key);
+                }
+                EventType::ButtonPress(button) => {
+                    state_for_cb.press_button(button);
+                }
+                EventType::ButtonRelease(button) => {
+                    state_for_cb.release_button(button);
+                }
+                _ => {}
+            };
+
+            if let Err(e) = listen(callback) {
+                tracing::error!(
+                    "Hotkey listener error (retry in {}s): {:?}",
+                    backoff_secs,
+                    e
+                );
+                std::thread::sleep(std::time::Duration::from_secs(backoff_secs));
+                backoff_secs = (backoff_secs * 2).min(MAX_BACKOFF_SECS);
+            } else {
+                // listen() returned Ok — this is unexpected for a blocking call
+                // and usually means the event loop exited normally.  Retry once
+                // more after a short delay in case it's a transient condition.
+                tracing::warn!("Hotkey listener exited unexpectedly, restarting...");
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                backoff_secs = 1;
+            }
         }
     });
 
@@ -326,7 +348,12 @@ pub fn type_text(text: &str, leave_in_clipboard: bool) -> Result<()> {
 
     // For short text, type character by character
     // For longer text, use clipboard paste
-    if text.chars().count() > 10 {
+    //
+    // Non-ASCII characters (CJK, accents, emoji) cannot be reliably typed via
+    // rdev's Key::Unknown path, which drops them. Route any text containing
+    // non-ASCII characters through the clipboard paste path regardless of length.
+    let has_non_ascii = text.chars().any(|c| !c.is_ascii());
+    if text.chars().count() > 10 || has_non_ascii {
         type_via_clipboard(text, leave_in_clipboard)
     } else {
         type_character_by_character(text)?;
@@ -371,8 +398,15 @@ fn type_via_clipboard(text: &str, leave_in_clipboard: bool) -> Result<()> {
     let paste_result = simulate_key_combination(&[Key::ControlLeft, Key::KeyV]);
 
     if !leave_in_clipboard {
-        // Restore old clipboard content after paste has had time to land
-        std::thread::sleep(std::time::Duration::from_millis(200));
+        // Restore old clipboard content after paste has had time to land.
+        //
+        // Race condition: there is no reliable cross-platform way to detect when
+        // the target application has consumed the Ctrl+V paste, so we restore on
+        // a fixed delay. If we restore too quickly the app may paste the old
+        // clipboard contents instead of the new text; if too slowly, the user
+        // observes stale clipboard contents briefly. 500ms is a best-effort
+        // heuristic that errs toward correctness of the paste.
+        std::thread::sleep(std::time::Duration::from_millis(500));
         let _ = arboard::Clipboard::new().and_then(|mut cb| cb.set_text(old_clipboard));
     }
 

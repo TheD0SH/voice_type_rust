@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { MutableRefObject } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { configsEqual } from "../lib/config";
 import type { Config } from "../types";
 
 export function useAutosave(
@@ -40,6 +41,19 @@ export function useAutosave(
 
     return () => window.clearTimeout(timeoutId);
   }, [autosaving, capturingHotkey, config, dirty, loading]);
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (dirty && !configsEqual(config, savedConfigRef.current)) {
+        void invoke("save_config", { config });
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [config, dirty]);
 
   return { autosaving, persistConfig };
 }
