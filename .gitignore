@@ -6,6 +6,10 @@ target-jpeg/
 .vscode/
 package-lock.json
 
+# Build artifacts (auto-generated)
+frontend/tsconfig.tsbuildinfo
+src-tauri/gen/schemas/
+
 *.log
 npm-debug.log*
 yarn-debug.log*

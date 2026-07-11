@@ -76,7 +76,7 @@ You can either:
 
 - This repo is the current codebase.
 - The older Python-based implementation should be treated as legacy.
-- Bundled public image sources are documented in [ASSET_SOURCES.md](/c:/Users/Borin/OneDrive/Documents/voice_type_rust/ASSET_SOURCES.md).
+- Bundled public image sources are documented in [ASSET_SOURCES.md](ASSET_SOURCES.md).
 
 ## Building for Release
 
