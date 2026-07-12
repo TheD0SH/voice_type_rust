@@ -135,12 +135,6 @@ impl RuntimeState {
         self.gui_tx
             .try_send(GuiCommand::UpdateConfig(config.clone()))
             .ok();
-        self.gui_tx
-            .try_send(GuiCommand::SetStatus("Settings saved".to_string()))
-            .ok();
-        self.gui_tx
-            .try_send(GuiCommand::SetState(AppState::Done))
-            .ok();
 
         if let Some(window) = app.get_webview_window("main") {
             let _ = window.set_always_on_top(config.always_on_top);
@@ -171,6 +165,29 @@ impl RuntimeState {
             .try_send(GuiCommand::SetStatus(status_text.into()))
             .ok();
         self.gui_tx.try_send(GuiCommand::SetState(state)).ok();
+    }
+
+    /// Persist the HUD window position so it survives restarts.
+    pub async fn save_hud_position(&self, x: i32, y: i32) -> Result<(), String> {
+        let mut config = {
+            let state = self.shared_state.lock().await;
+            state.config.clone()
+        };
+        config.hud_position_x = Some(x);
+        config.hud_position_y = Some(y);
+
+        config::save(&config).map_err(|e| e.to_string())?;
+
+        {
+            let mut state = self.shared_state.lock().await;
+            state.config.hud_position_x = Some(x);
+            state.config.hud_position_y = Some(y);
+        }
+
+        self.gui_tx
+            .try_send(GuiCommand::UpdateConfig(config))
+            .ok();
+        Ok(())
     }
 }
 

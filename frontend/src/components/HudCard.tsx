@@ -1,5 +1,6 @@
-import { buildHudCardStyle, hudDescription, hudHeadline, normalizeHudBackgroundMode } from "../lib/hud";
+import { buildHudCardStyle, hudHeadline, normalizeHudBackgroundMode } from "../lib/hud";
 import { runtimeBadge } from "../lib/appearance";
+import { APP_DISPLAY_NAME } from "../lib/options";
 import type { Config, RuntimeSnapshot } from "../types";
 import { RuntimeMeter } from "./RuntimeMeter";
 
@@ -15,11 +16,9 @@ export function HudCard(props: {
   const { active, backgroundUrl, config, level, peak, preview = false, snapshot } = props;
 
   const headline = hudHeadline(snapshot.appState);
-  const description = hudDescription(snapshot);
   const stateMeta = runtimeBadge(snapshot.appState);
   const backgroundMode = normalizeHudBackgroundMode(config.hud_background_mode);
   const showTopline = config.hud_show_state || config.hud_show_app_name;
-  const showDescription = config.hud_show_description && Boolean(description);
   const showMeter = config.hud_show_meter;
   const cardStyle = buildHudCardStyle(config, backgroundUrl);
   const mediaClass = backgroundMode === "image" && backgroundUrl ? " hud-card-media" : "";
@@ -30,27 +29,30 @@ export function HudCard(props: {
       data-state={snapshot.appState}
       style={cardStyle}
     >
-      {showTopline ? (
-        <div
-          className={`hud-topline${config.hud_show_state && config.hud_show_app_name ? "" : " hud-topline-single"}`}
-        >
-          {config.hud_show_state ? (
-            <span className={stateMeta.tone}>
-              <span className="hud-dot" />
-              {stateMeta.label}
-            </span>
+      <div className="hud-card-content">
+        <div className="hud-copy">
+          {showTopline ? (
+            <div className="hud-topline-row">
+              {config.hud_show_state ? (
+                <span className={stateMeta.tone}>
+                  {stateMeta.label}
+                </span>
+              ) : null}
+              {config.hud_show_app_name ? <span className="hud-chip">{APP_DISPLAY_NAME}</span> : null}
+            </div>
           ) : null}
-
-          {config.hud_show_app_name ? <span className="hud-chip">Voice Type</span> : null}
+          <strong className="hud-title">{headline}</strong>
         </div>
-      ) : null}
 
-      <div className="hud-copy">
-        <strong className="hud-title">{headline}</strong>
-        {showDescription ? <p className="hud-description">{description}</p> : null}
+        {showMeter ? (
+          <RuntimeMeter
+            active={active}
+            level={level}
+            peak={peak}
+            cssDriven={!preview}
+          />
+        ) : null}
       </div>
-
-      {showMeter ? <RuntimeMeter active={active} level={level} peak={peak} /> : null}
     </div>
   );
 }

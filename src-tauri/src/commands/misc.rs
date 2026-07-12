@@ -1,3 +1,14 @@
+use crate::runtime::RuntimeState;
+
+#[tauri::command]
+pub async fn save_hud_position(
+    runtime: tauri::State<'_, RuntimeState>,
+    x: i32,
+    y: i32,
+) -> Result<(), String> {
+    runtime.save_hud_position(x, y).await
+}
+
 #[tauri::command]
 pub fn open_external_url(url: String) -> Result<(), String> {
     let trimmed = url.trim();

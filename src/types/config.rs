@@ -155,6 +155,17 @@ pub struct Config {
     #[serde(default)]
     pub hud_background_color: String,
 
+    /// Keep the HUD always visible and interactive (draggable).
+    #[serde(default)]
+    pub hud_pinned: bool,
+
+    /// Saved HUD window position (logical pixels).  None = use corner default.
+    #[serde(default)]
+    pub hud_position_x: Option<i32>,
+
+    #[serde(default)]
+    pub hud_position_y: Option<i32>,
+
     /// Auto-copy transcription to clipboard
     #[serde(default)]
     pub auto_copy: bool,
@@ -201,6 +212,9 @@ impl Default for Config {
             hud_background_mode: default_hud_background_mode(),
             hud_background_path: String::new(),
             hud_background_color: String::new(),
+            hud_pinned: false,
+            hud_position_x: None,
+            hud_position_y: None,
             auto_copy: false,
             provider: PROVIDER_GROQ.to_string(),
         }

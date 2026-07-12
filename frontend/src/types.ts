@@ -39,6 +39,9 @@ export interface Config {
   hud_background_mode: HudBackgroundMode;
   hud_background_path: string;
   hud_background_color: string;
+  hud_pinned: boolean;
+  hud_position_x: number | null;
+  hud_position_y: number | null;
   auto_copy: boolean;
   provider: string;
 }

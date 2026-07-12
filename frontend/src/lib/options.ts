@@ -63,9 +63,15 @@ export const fallbackConfig: Config = {
   hud_background_mode: "image",
   hud_background_path: "",
   hud_background_color: "",
+  hud_pinned: false,
+  hud_position_x: null,
+  hud_position_y: null,
   auto_copy: false,
   provider: "groq"
 };
+
+/** App display name — must match APP_DISPLAY_NAME in src/config/constants.rs */
+export const APP_DISPLAY_NAME = "Voice Type";
 
 export const fallbackInfo: AppInfo = {
   appName: "Voice Type",

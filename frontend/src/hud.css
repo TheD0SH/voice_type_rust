@@ -1,0 +1,262 @@
+/* HUD-only stylesheet — loaded exclusively by hud-main.tsx.
+   Keeps the overlay bundle small and independent from the settings UI. */
+
+:root {
+  font-family: "Aptos", "Segoe UI Variable Display", "Bahnschrift", "Trebuchet MS", sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-size: 16px;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+  height: 100%;
+}
+
+/* The HUD window is transparent — no opaque background like the main app. */
+html,
+body,
+#root {
+  background: transparent !important;
+}
+
+body {
+  overflow: hidden;
+}
+
+/* Shared design tokens (also defined in app.css for the main window). */
+.hud-shell {
+  --panel-bg: rgba(17, 20, 24, 0.82);
+  --section-bg: rgba(22, 26, 31, 0.82);
+  --card-bg: rgba(17, 20, 24, 0.78);
+  --field: rgba(11, 14, 18, 0.7);
+  --border: rgba(255, 255, 255, 0.12);
+  --text-primary: #f3f5f7;
+  --text-secondary: rgba(243, 245, 247, 0.72);
+  --text-muted: rgba(243, 245, 247, 0.45);
+  --accent: #6c86a5;
+  --accent-soft: rgba(108, 134, 165, 0.18);
+  --ready: rgba(62, 97, 68, 0.52);
+  --recording: rgba(63, 96, 138, 0.58);
+  --processing: rgba(142, 112, 48, 0.52);
+  --done: rgba(92, 77, 140, 0.56);
+  --error: rgba(144, 64, 82, 0.58);
+  color: var(--text-primary);
+}
+
+/* ---- HUD shell ---- */
+
+.hud-shell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 0.42rem;
+  background: transparent;
+}
+
+.hud-shell-pinned {
+  cursor: grab;
+}
+
+.hud-shell-pinned:active {
+  cursor: grabbing;
+}
+
+/* ---- HUD card ---- */
+
+.hud-card {
+  position: relative;
+  display: grid;
+  gap: 0.38rem;
+  width: 100%;
+  height: 100%;
+  padding: 0.6rem 0.72rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--card-bg);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(12px);
+}
+
+.hud-card-preview {
+  width: 100%;
+  max-width: 260px;
+  min-height: 84px;
+  height: auto;
+  pointer-events: none;
+}
+
+.hud-card[data-state="recording"] {
+  border-color: rgba(127, 174, 246, 0.32);
+}
+
+.hud-card[data-state="processing"] {
+  border-color: rgba(210, 182, 124, 0.32);
+}
+
+.hud-topline-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.2rem;
+}
+
+.hud-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.24rem 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(8, 12, 16, 0.34);
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hud-dot {
+  width: 0.56rem;
+  height: 0.56rem;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.28);
+}
+
+.state-pill.recording .hud-dot {
+  animation: hud-dot-pulse 1.3s ease-out infinite;
+}
+
+@keyframes hud-dot-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.28);
+  }
+
+  70% {
+    box-shadow: 0 0 0 0.45rem rgba(255, 255, 255, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+  }
+}
+
+/* ---- HUD text ---- */
+
+.hud-copy {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 0.12rem;
+}
+
+.hud-title {
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.08;
+}
+
+.hud-description {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+
+/* ---- Bar meter (voice level visualizer) ---- */
+
+.meter-shell {
+  position: relative;
+  z-index: 1;
+  height: 42px;
+  border-radius: 12px;
+  background: rgba(8, 11, 15, 0.26);
+  overflow: hidden;
+}
+
+.meter-bars {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(20, minmax(0, 1fr));
+  align-items: end;
+  gap: 0.16rem;
+  padding: 0.48rem 0.56rem;
+}
+
+.meter-bar {
+  position: relative;
+  align-self: end;
+  height: var(--bar-height);
+  min-height: 8%;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    var(--meter-color-top, rgba(160, 200, 255, 0.9)) 0%,
+    var(--meter-color-start, rgba(100, 150, 230, 0.8)) 46%,
+    var(--meter-color-end, rgba(70, 120, 200, 0.6)) 100%
+  );
+  opacity: var(--bar-opacity);
+  transform-origin: bottom center;
+  transform: scaleY(0.96);
+  will-change: transform, opacity;
+}
+
+.meter-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.24), transparent 46%);
+  mix-blend-mode: screen;
+}
+
+.meter-shell-active .meter-bar {
+  animation: meter-bar-pulse 1.7s ease-in-out infinite;
+  animation-delay: var(--bar-delay);
+}
+
+@keyframes meter-bar-pulse {
+  0%,
+  100% {
+    transform: scaleY(0.94);
+  }
+
+  45% {
+    transform: scaleY(var(--bar-bounce));
+  }
+}
+
+/* CSS-driven meter bars (HUD only) — animated via DOM ref, no React re-renders.
+   Do NOT re-declare --meter-level/--meter-peak here; they inherit from .hud-shell. */
+
+.meter-bar-css-driven {
+  height: calc(
+    (var(--bar-floor) + var(--meter-level) * var(--bar-ridge) * var(--bar-pattern) +
+      var(--meter-peak) * 0.12 * (1 - var(--bar-offset) * 0.55)) * 100%
+  );
+  min-height: 8%;
+  opacity: calc(0.2 + var(--meter-level) * 0.7);
+  transform-origin: bottom center;
+  transform: scaleY(0.96);
+  will-change: transform, opacity;
+}
+
+.hud-card-media::before,
+.hud-card-media::after {
+  display: none;
+}
+

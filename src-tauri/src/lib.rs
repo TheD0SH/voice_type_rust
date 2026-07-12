@@ -3,7 +3,7 @@ mod runtime;
 
 use commands::*;
 use runtime::{RuntimeState, init_logging};
-use runtime::hud::ensure_hud_window;
+use runtime::hud::sync_hud_window;
 use runtime::tray::create_tray;
 use serde::Serialize;
 use tauri::Manager;
@@ -37,10 +37,11 @@ pub fn run() {
             let initial_snapshot = runtime.snapshot();
             app.manage(runtime);
 
-            if let Err(e) =
-                ensure_hud_window(&app.handle(), &initial_snapshot.config)
-            {
-                tracing::warn!("HUD window creation failed: {}", e);
+            // The HUD window is created lazily by sync_hud_window when it's
+            // first needed (first recording or if pinned).  This avoids a
+            // brief flash of the transparent window at startup on Windows.
+            if initial_snapshot.config.hud_pinned {
+                sync_hud_window(&app.handle(), &initial_snapshot);
             }
 
             let _tray = match create_tray(&app.handle()) {
@@ -80,6 +81,7 @@ pub fn run() {
             import_hud_background_image,
             load_background_image_data_url,
             open_external_url,
+            save_hud_position,
             quit_app,
             has_configured_api_key,
             get_history,

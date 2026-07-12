@@ -120,6 +120,11 @@ export function HudStageSection(props: {
                 checked={config.hud_show_meter}
                 onChange={(value) => onUpdate("hud_show_meter", value)}
               />
+              <ChipToggle
+                label="Pin"
+                checked={config.hud_pinned}
+                onChange={(value) => onUpdate("hud_pinned", value)}
+              />
             </div>
           </div>
 
@@ -141,9 +146,11 @@ export function HudStageSection(props: {
           />
 
           <p className="hud-stage-note">
-            {config.hud_enabled
-              ? `Shows in the ${cornerLabel} corner while recording or transcribing.`
-              : "Hidden until you turn it back on."}
+            {config.hud_pinned
+              ? "Pinned — HUD stays visible and can be dragged."
+              : config.hud_enabled
+                ? `Shows in the ${cornerLabel} corner while recording or transcribing.`
+                : "Hidden until you turn it back on."}
           </p>
         </div>
       </div>
