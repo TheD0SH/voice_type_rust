@@ -6,7 +6,7 @@ Hold your hotkey, speak, release, and the app transcribes your speech with Groq 
 
 ## Current State
 
-- Version: `0.3.2`
+- Version: `0.7.2`
 - Desktop shell: `Tauri 2`
 - Frontend: `React + TypeScript + Vite`
 - Backend engine: `Rust + Tokio`
@@ -47,14 +47,14 @@ Hold your hotkey, speak, release, and the app transcribes your speech with Groq 
 ### Commands
 
 ```bash
-bun install
-bun run tauri:dev
+npm install
+npm run tauri:dev
 ```
 
 Useful checks:
 
 ```bash
-bun run build
+npm run build
 cargo check --lib
 cargo check --manifest-path src-tauri/Cargo.toml
 ```
@@ -83,21 +83,21 @@ You can either:
 ### NSIS Installer
 
 ```bash
-bun run tauri build
+npm run tauri:build
 ```
 
-Output: `src-tauri/target/release/bundle/nsis/Voice Type_0.3.2_x64-setup.exe`
+Output: `src-tauri/target/release/bundle/nsis/Voice Type_0.7.2_x64-setup.exe`
 
 ### Microsoft Store (MSIX)
 
 Requires Windows SDK with `makeappx.exe` (already installed).
 
 ```bash
-bun run tauri build
-bun run msix
+npm run tauri:build
+npm run msix
 ```
 
-Output: `msix-output/Boring877.VoiceType_0.3.2.0_x64__kg07y93afj4jj.msix`
+Output: `msix-output/Boring877.VoiceType_0.7.2.0_x64__kg07y93afj4jj.msix`
 
 Upload the `.msix` file to [Microsoft Partner Center](https://partner.microsoft.com/dashboard) to update the Store listing.
 

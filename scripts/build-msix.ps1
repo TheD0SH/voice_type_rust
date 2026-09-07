@@ -12,7 +12,7 @@ $OutputDir = Join-Path $ProjectRoot "msix-output"
 $StagingDir = Join-Path $OutputDir "staging"
 
 if (-not (Test-Path $ExePath)) {
-    Write-Error "voice_type_tauri.exe not found at $ExePath. Run 'bun run tauri build' first."
+    Write-Error "voice_type_tauri.exe not found at $ExePath. Run 'npm run tauri:build' first."
     exit 1
 }
 

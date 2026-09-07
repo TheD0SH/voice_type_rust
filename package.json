@@ -1,8 +1,8 @@
 {
   "name": "voice-type-desktop",
   "private": true,
-  "version": "0.7.1",
-  "packageManager": "bun@1.2.7",
+  "version": "0.7.2",
+  "packageManager": "npm@11.6.0",
   "type": "module",
   "scripts": {
     "dev": "vite --config frontend/vite.config.ts",
@@ -14,7 +14,7 @@
     "msix": "powershell -ExecutionPolicy Bypass -File scripts/build-msix.ps1"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/api": "2.10.1",
     "@tauri-apps/plugin-dialog": "^2.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
